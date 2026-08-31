@@ -4,8 +4,9 @@
 
 const byte chipSelect = 10;
 
-const uint16_t N = 128;               // 128 muestras
-const unsigned long intervalo = 200;  // 200 us = 5 kHz
+const uint16_t N = 128;               // Muestras por bloque
+const uint16_t BLOQUES_MAX = 8;       // 8 × 128 = 1024 muestras
+const unsigned long intervalo = 1000; // 1 kHz
 
 uint16_t buffer[N];
 
@@ -16,23 +17,20 @@ void setup() {
 
   lcd.init();
   lcd.backlight();
-  lcd.print("Iniciando SD...");
+  lcd.print(F("Iniciando SD..."));
 
   pinMode(chipSelect, OUTPUT);
 
   if (!SD.begin(chipSelect)) {
-    Serial.println("Error al iniciar SD");
+    Serial.println(F("Error al iniciar SD"));
     lcd.clear();
-    lcd.print("Error SD");
+    lcd.print(F("Error SD"));
     while (true);
   }
 
-  // ============================================================
-  // NOMBRE DEL ARCHIVO (Cámbialo para cada frecuencia)
-  // ============================================================
-  const char* nombreArchivo = "F1500.BIN";  // ¡EXTENSIÓN .BIN!
+  const char nombreArchivo[] = "F050.BIN";
 
-  // Elimina una prueba anterior con el mismo nombre
+  // Elimina una captura anterior con el mismo nombre.
   if (SD.exists(nombreArchivo)) {
     SD.remove(nombreArchivo);
   }
@@ -40,51 +38,54 @@ void setup() {
   File archivo = SD.open(nombreArchivo, FILE_WRITE);
 
   if (!archivo) {
-    Serial.println("Error al abrir archivo");
+    Serial.println(F("Error al abrir archivo"));
     lcd.clear();
-    lcd.print("Error archivo");
+    lcd.print(F("Error archivo"));
     while (true);
   }
 
-  // ============================================================
-  // 1. ADQUIRIR LA SEÑAL (muestreo)
-  // ============================================================
   lcd.clear();
-  lcd.print("Muestreando...");
+  lcd.print(F("Muestreando..."));
 
-  unsigned long siguienteMuestra = micros();
+  for (uint16_t bloque = 0; bloque < BLOQUES_MAX; bloque++) {
+    unsigned long siguienteMuestra = micros();
 
-  for (uint16_t i = 0; i < N; i++) {
-    while ((long)(micros() - siguienteMuestra) < 0) {
-      // Esperar hasta la siguiente muestra
+    // Captura 128 muestras.
+    for (uint16_t i = 0; i < N; i++) {
+      while (micros() < siguienteMuestra) {
+      }
+
+      buffer[i] = analogRead(A0);
+      siguienteMuestra += intervalo;
     }
 
-    buffer[i] = analogRead(A0);
-    siguienteMuestra += intervalo;
+    // Guarda el bloque en la SD: 128 × 2 = 256 bytes.
+    size_t escritos = archivo.write(
+      (const uint8_t*)buffer,
+      sizeof(buffer)
+    );
+
+    if (escritos != sizeof(buffer)) {
+      Serial.println(F("SD llena o error"));
+      archivo.close();
+
+      lcd.clear();
+      lcd.print(F("Error escritura"));
+      while (true);
+    }
   }
-
-  // ============================================================
-  // 2. GUARDAR EN FORMATO BINARIO (BIN)
-  // ============================================================
-  lcd.clear();
-  lcd.print("Guardando BIN...");
-
-  // Escribir todo el buffer de una sola vez (más eficiente)
-  // buffer tiene N elementos de 2 bytes cada uno (uint16_t)
-  size_t bytesEscritos = archivo.write((uint8_t*)buffer, sizeof(buffer));
 
   archivo.flush();
   archivo.close();
 
-  // ============================================================
-  // 3. MOSTRAR RESULTADOS
-  // ============================================================
   lcd.clear();
-  lcd.print("BIN listo");
+  lcd.print(F("Captura lista"));
 
-  while (true); // Detiene la captura
+  Serial.println(F("1024 muestras guardadas"));
+  Serial.println(F("Archivo: F050.BIN"));
+
+  while (true);
 }
 
 void loop() {
-  // El programa se detiene después de la adquisición
 }
