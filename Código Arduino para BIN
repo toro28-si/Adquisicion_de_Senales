@@ -1,0 +1,95 @@
+/*
+ * ADQUISICIÓN DE SEÑALES - FORMATO BINARIO
+ * 
+ * Este código toma 128 muestras del ADC y las guarda en formato binario
+ * en una tarjeta SD. Cada muestra ocupa 2 bytes (uint16_t).
+ */
+
+#include <SPI.h>
+#include <SD.h>
+
+// ============================================================
+// CONFIGURACIÓN
+// ============================================================
+
+#define PIN_CS 10
+#define PIN_BOTON 2
+#define NUM_MUESTRAS 128
+#define INTERVALO_US 200
+
+// ============================================================
+// VARIABLES GLOBALES
+// ============================================================
+
+File archivo;
+bool adquiriendo = false;
+
+// ============================================================
+// SETUP
+// ============================================================
+
+void setup() {
+    Serial.begin(9600);
+    pinMode(PIN_BOTON, INPUT_PULLUP);
+    
+    if (!SD.begin(PIN_CS)) {
+        Serial.println("❌ Error al inicializar la tarjeta SD");
+        return;
+    }
+    Serial.println("✅ Tarjeta SD inicializada");
+    Serial.println("📊 Presiona el botón para iniciar la adquisición...");
+}
+
+// ============================================================
+// LOOP PRINCIPAL
+// ============================================================
+
+void loop() {
+    if (digitalRead(PIN_BOTON) == LOW && !adquiriendo) {
+        adquiriendo = true;
+        Serial.println("🔴 Iniciando adquisición binaria...");
+        adquirir();
+        adquiriendo = false;
+        Serial.println("✅ Adquisición completada");
+        Serial.println("📊 Presiona el botón para otra adquisición...");
+    }
+}
+
+// ============================================================
+// FUNCIÓN DE ADQUISICIÓN
+// ============================================================
+
+void adquirir() {
+    String nombre = "BIN_";
+    nombre += String(millis());
+    nombre += ".BIN";
+    
+    archivo = SD.open(nombre.c_str(), FILE_WRITE);
+    if (!archivo) {
+        Serial.println("❌ Error al crear el archivo");
+        return;
+    }
+    
+    // Crear buffer para almacenar todas las muestras
+    uint16_t buffer[NUM_MUESTRAS];
+    
+    // Tomar muestras
+    for (int i = 0; i < NUM_MUESTRAS; i++) {
+        unsigned long tiempo_inicio = micros();
+        buffer[i] = analogRead(A0);
+        
+        while (micros() - tiempo_inicio < INTERVALO_US) {
+            // Esperar
+        }
+    }
+    
+    // Escribir todo el buffer de una vez (más eficiente)
+    archivo.write((uint8_t*)buffer, sizeof(buffer));
+    archivo.close();
+    
+    Serial.print("✅ Archivo binario guardado: ");
+    Serial.println(nombre);
+    Serial.print("📊 Tamaño: ");
+    Serial.print(sizeof(buffer));
+    Serial.println(" bytes");
+}
