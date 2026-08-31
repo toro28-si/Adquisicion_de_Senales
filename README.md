@@ -4,6 +4,7 @@
 
 ## 📋 Descripción
 
-Este repositorio contiene los códigos utilizados para la adquisición de señales 
+Este repositorio contiene los datos obtenidos en formato .BIN y .CSV, 
+los códigos utilizados para la adquisición de señales 
 con Arduino Nano y su posterior análisis en Python.
 
