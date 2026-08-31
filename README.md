@@ -7,4 +7,3 @@
 Este repositorio contiene los códigos utilizados para la adquisición de señales 
 con Arduino Nano y su posterior análisis en Python.
 
-## 📁 Estructura
