@@ -1,105 +1,91 @@
-/*
- * ADQUISICIÓN DE SEÑALES - FORMATO CSV
- * 
- * Este código toma 128 muestras del ADC y las guarda en formato CSV
- * en una tarjeta SD. Cada muestra incluye: número, tiempo (µs) y valor ADC.
- */
-
 #include <SPI.h>
 #include <SD.h>
+#include <LiquidCrystal_I2C.h>
 
-// ============================================================
-// CONFIGURACIÓN
-// ============================================================
+const byte chipSelect = 10;
 
-#define PIN_CS 10          // Pin Chip Select para la SD
-#define PIN_BOTON 2        // Pin para el botón de inicio
-#define NUM_MUESTRAS 128   // Número de muestras a tomar
-#define INTERVALO_US 200   // Intervalo entre muestras (200 µs → 5000 Hz)
+const uint16_t N = 128;               // 128 muestras
+const unsigned long intervalo = 200;  // 200 us = 5 kHz
 
-// ============================================================
-// VARIABLES GLOBALES
-// ============================================================
+uint16_t buffer[N];
 
-File archivo;
-bool adquiriendo = false;
-
-// ============================================================
-// SETUP
-// ============================================================
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void setup() {
-    Serial.begin(9600);
-    pinMode(PIN_BOTON, INPUT_PULLUP);
-    
-    // Inicializar tarjeta SD
-    if (!SD.begin(PIN_CS)) {
-        Serial.println("❌ Error al inicializar la tarjeta SD");
-        return;
-    }
-    Serial.println("✅ Tarjeta SD inicializada");
-    
-    Serial.println("📊 Presiona el botón para iniciar la adquisición...");
-}
+  Serial.begin(9600);
 
-// ============================================================
-// LOOP PRINCIPAL
-// ============================================================
+  lcd.init();
+  lcd.backlight();
+  lcd.print("Iniciando SD...");
+
+  pinMode(chipSelect, OUTPUT);
+
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Error al iniciar SD");
+    lcd.clear();
+    lcd.print("Error SD");
+    while (true);
+  }
+
+  // Cámbialo para cada frecuencia del generador
+  const char* nombreArchivo = "F1500.CSV";
+
+  // Elimina una prueba anterior con el mismo nombre
+  if (SD.exists(nombreArchivo)) {
+    SD.remove(nombreArchivo);
+  }
+
+  File archivo = SD.open(nombreArchivo, FILE_WRITE);
+
+  if (!archivo) {
+    Serial.println("Error al abrir archivo");
+    lcd.clear();
+    lcd.print("Error archivo");
+    while (true);
+  }
+
+  // 1. Adquiere la señal primero, sin escribir a la SD
+  lcd.clear();
+  lcd.print("Muestreando...");
+
+  unsigned long siguienteMuestra = micros();
+
+  for (uint16_t i = 0; i < N; i++) {
+    while ((long)(micros() - siguienteMuestra) < 0) {
+      // Esperar hasta la siguiente muestra
+    }
+
+    buffer[i] = analogRead(A0);
+    siguienteMuestra += intervalo;
+  }
+
+  // 2. Convierte y guarda los datos como texto CSV
+  lcd.clear();
+  lcd.print("Guardando CSV...");
+
+  archivo.println("muestra,tiempo_us,amplitud_adc");
+
+  for (uint16_t i = 0; i < N; i++) {
+    archivo.print(i);
+    archivo.print(",");
+
+    archivo.print((unsigned long)i * intervalo);
+    archivo.print(",");
+
+    archivo.println(buffer[i]);
+  }
+
+  archivo.flush();
+  archivo.close();
+
+  lcd.clear();
+  lcd.print("CSV listo");
+
+  Serial.println("256 muestras guardadas");
+  Serial.println("Archivo: F050.CSV");
+
+  while (true); // Detiene la captura
+}
 
 void loop() {
-    // Esperar a que se presione el botón
-    if (digitalRead(PIN_BOTON) == LOW && !adquiriendo) {
-        adquiriendo = true;
-        Serial.println("🔴 Iniciando adquisición...");
-        adquirir();
-        adquiriendo = false;
-        Serial.println("✅ Adquisición completada");
-        Serial.println("📊 Presiona el botón para otra adquisición...");
-    }
-}
-
-// ============================================================
-// FUNCIÓN DE ADQUISICIÓN
-// ============================================================
-
-void adquirir() {
-    // Crear nombre de archivo único
-    String nombre = "DATOS_";
-    nombre += String(millis());
-    nombre += ".CSV";
-    
-    // Abrir archivo
-    archivo = SD.open(nombre.c_str(), FILE_WRITE);
-    if (!archivo) {
-        Serial.println("❌ Error al crear el archivo");
-        return;
-    }
-    
-    // Escribir encabezado
-    archivo.println("muestra,tiempo_us,amplitud_adc");
-    
-    // Tomar muestras
-    for (int i = 0; i < NUM_MUESTRAS; i++) {
-        unsigned long tiempo_inicio = micros();
-        int valor_adc = analogRead(A0);
-        unsigned long tiempo_fin = micros();
-        unsigned long tiempo_us = tiempo_fin - tiempo_inicio;
-        
-        // Guardar en CSV
-        archivo.print(i);
-        archivo.print(",");
-        archivo.print(tiempo_us);
-        archivo.print(",");
-        archivo.println(valor_adc);
-        
-        // Esperar hasta el siguiente intervalo
-        while (micros() - tiempo_inicio < INTERVALO_US) {
-            // Esperar
-        }
-    }
-    
-    // Cerrar archivo
-    archivo.close();
-    Serial.print("✅ Archivo guardado: ");
-    Serial.println(nombre);
 }
