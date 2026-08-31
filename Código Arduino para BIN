@@ -5,7 +5,7 @@
 const byte chipSelect = 10;
 
 const uint16_t N = 128;               // Muestras por bloque
-const uint16_t BLOQUES_MAX = 8;       // 8 × 128 = 1024 muestras
+const uint16_t BLOQUES_MAX = 16;       // 8 × 128 = 1024 muestras
 const unsigned long intervalo = 1000; // 1 kHz
 
 uint16_t buffer[N];
